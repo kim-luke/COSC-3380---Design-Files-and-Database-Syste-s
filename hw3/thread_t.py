@@ -39,7 +39,7 @@ def callThread():
         thread.join()
         logging.info("Main    : thread %d done", index)
 
-def yesTrans(fileName, threadNum):
+def yesTrans(server_var, fileName, threadNum):
     file = open(fileName, 'r')
     for i in file:
         string = i.split(',')
@@ -50,16 +50,35 @@ def yesTrans(fileName, threadNum):
             #check for availability
             #i.e. check if the value in flight_id column matches string[1]
             # and check if 
-            sql = "select * from bookings.flights;"
+            print("before execution")
+            sql = " select * from flights where flight_id = " + string[1] + ";"
+            server_var[0].execute(sql)
+            fetch = server_var[0].fetchall()
+            print(fetch)
+
+            sql = "start transaction;"
+            sql += " update flights"
+            sql += " set seats_booked = case"
+            sql += " when seats_booked > 0 and flight_id = " + string[1] + " then seats_booked-1"
+            sql += " else -1"
+            sql += " end,"
+            sql += " seats_available = case "
+            sql += " when flight_id = " + string[1] + " then seats_available+1"
+            sql += " else -1"
+            sql += " end;"
+            sql += " commit;"
+
+            server_var[0].execute(sql)
+
+            print("after execution")
+            sql = " select * from flights where flight_id = " + string[1] + ";"
+            server_var[0].execute(sql)
+            fetch = server_var[0].fetchall()
+            print(fetch)
 
 def updateDB(server_var, inputList):
-    sql = "select * from bookings.flights;"
-    server_var[0].execute(sql)
-    fetch = server_var[0].fetchall()
-    server_var[1].commit()
-
     if inputList[1] == 'y':
-        yesTrans(inputList[0], inputList[2]) #(fileName, # of threads)
+        yesTrans(server_var, inputList[0], inputList[2]) #(fileName, # of threads)
         """
             1. grab the passenger id
             2. grab the flights id
