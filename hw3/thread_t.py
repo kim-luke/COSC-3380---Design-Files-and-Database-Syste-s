@@ -46,25 +46,35 @@ def yesTrans(server_var, fileName, threadNum):
 
         #if the string before the first ',' is a digit
         if string[0].isdigit(): 
-            print(string[0] + " " + string[1])
+            # print(string[0] + " " + string[1])
             #check for availability
             #i.e. check if the value in flight_id column matches string[1]
             # and check if 
+
+            sql = "drop table if exists temp;"
+            sql += " create table temp( "
+            sql += " flight_id int,"
+            sql += " seats_booked int,"
+            sql += " seats_available int );"
+            server_var[0].execute(sql)
+            server_var[1].commit()
+
             print("before execution")
             sql = " select * from flights where flight_id = " + string[1] + ";"
             server_var[0].execute(sql)
             fetch = server_var[0].fetchall()
-            print(fetch)
+            for index in fetch:
+                print(str(index[0]) + " " + str(index[8]) + " " + str(index[9]))
+
 
             sql = "start transaction;"
             sql += " update flights"
-            sql += " set seats_booked = case"
-            sql += " when seats_booked > 0 and flight_id = " + string[1] + " then seats_booked-1"
-            sql += " else -1"
+            sql += " set seats_available = case"
+            sql += " when seats_available > 0 and seats_available is not null and flight_id = " + string[1]
+            sql += " then seats_available-1"
             sql += " end,"
-            sql += " seats_available = case "
-            sql += " when flight_id = " + string[1] + " then seats_available+1"
-            sql += " else -1"
+            sql += " seats_booked = case "
+            sql += " when flight_id = " + string[1] + " then seats_booked+1"
             sql += " end;"
             sql += " commit;"
 
@@ -74,7 +84,9 @@ def yesTrans(server_var, fileName, threadNum):
             sql = " select * from flights where flight_id = " + string[1] + ";"
             server_var[0].execute(sql)
             fetch = server_var[0].fetchall()
-            print(fetch)
+            for index in fetch:
+                print(str(index[0]) + " " + str(index[8]) + " " + str(index[9]))
+
 
 def updateDB(server_var, inputList):
     if inputList[1] == 'y':
@@ -107,7 +119,7 @@ def main(argv):
     
     #input # of thread
     inputThreadNum = restOfLines[restOfLines.find('=')+1: len(restOfLines)]
-    print(inputFileName + " " + inputYesNo + " " + inputThreadNum)
+    # print(inputFileName + " " + inputYesNo + " " + inputThreadNum)
     inputs.append(inputThreadNum)
 
     returned_server_var = connectWithDB()
