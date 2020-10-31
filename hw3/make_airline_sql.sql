@@ -90,7 +90,7 @@ CREATE TABLE ticket(
     ticket_no char(13) NOT NULL,
     book_ref character(6) NOT NULL,
     passenger_id varchar(20) NOT NULL,
-    passenger_name text NOT NULL,
+    passenger_name text,
     email char(50),
     phone char(15),
     PRIMARY KEY (ticket_no),
