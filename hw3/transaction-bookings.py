@@ -155,7 +155,7 @@ def yesTrans(server_var, fileName, threadNum):
 def noTrans(server_var, fileName, threadNum):
     file = open(fileName, 'r')
     book_ref = 60000
-    ticket_number = 6000000000
+    ticket_no = 6000000000
     y_m_d = [2003, 1, 2]
     m_d_str = ["", ""]
     for i in file:
@@ -187,27 +187,34 @@ def noTrans(server_var, fileName, threadNum):
             if y_m_d[2] < 10:
                 m_d_str[1] = addZero(y_m_d[2])
 
+            
             sql = " INSERT INTO bookings"
             sql += " VALUES(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 12700);" 
-
             server_var[0].execute(sql)
 
             sql = " SELECT * FROM bookings"
-            sql += " WHERE book_ref = '60110';"
+            server_var[0].execute(sql)
+            #fetch = server_var[0].fetchall()
+            #print(fetch)         
+            
+            sql = " INSERT INTO ticket(ticket_no, book_ref, passenger_id, passenger_name)"
+            sql += " VALUES(" + str(ticket_no) + ", " + str(book_ref) + ", " + string[0] + ", " + "'LUKE'" + ");"
+            server_var[0].execute(sql)
+
+            sql = " SELECT * FROM ticket"
             server_var[0].execute(sql)
             fetch = server_var[0].fetchall()
             print(fetch)
+            
+            sql = " INSERT INTO ticket_flights(ticket_no, flight_id, fare_conditions, amount)"
+            sql += " VALUES(" + str(ticket_no) + ", " + string[1] + ", " + "'Economy', " + "'12700');"
+            server_var[0].execute(sql)
 
-            """
-            sql = " INSERT INTO ticket(ticket_no, book_ref, passenger_id)"
-            sql += " VALUES(" + str(ticket_no) + ", " + str(book_ref) + ", " + string[0] + ");"
-
+            sql = " SELECT * FROM ticket_flights"
             server_var[0].execute(sql)
             fetch = server_var[0].fetchall()
-            print(fetch)
-            """ 
-            
-            
+            ##print(fetch)
+                
             #print(string[0])
             #print(string[1])
 
@@ -216,6 +223,7 @@ def noTrans(server_var, fileName, threadNum):
         y_m_d[0] = y_m_d[0] + 1
         y_m_d[1] = y_m_d[1] + 1
         y_m_d[2] = y_m_d[2] + 1
+        ticket_no = ticket_no + 1
             
 
 
@@ -223,11 +231,12 @@ def noTrans(server_var, fileName, threadNum):
         # 2. generate ticket_num, insert new record in ticket and ticket_flights IF available seats in specified flight AND date
         # 3. update seats_booked and seats_available in flights (simple)
         # 4. IF no available seats, ONLY book_ref generated and bookings updated
-
+ 
 def updateDB(server_var, inputList):
 
     #delete all the rows from all the tables
-    sql = "delete from ticket; "
+    sql = "truncate ticket CASCADE; "
+    sql += "delete from ticket_flights;"
     sql += "delete from bookings;"
     sql += " update flights "
     sql += " set seats_available = 50, seats_booked = 0; commit;"
