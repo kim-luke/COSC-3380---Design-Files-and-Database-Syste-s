@@ -43,59 +43,81 @@ def addZero(singleDigit):
     toReturn = '0' + str(singleDigit)
     return toReturn
 
+def yesTransThread(server_var, book_ref, ticket_no, y_m_d, m_d_str, lines):
+    """
+        y_m_d is a array with [year, month, day]
+        m_d_str is a array with [month, day] both data is in the data type string
+        
+        if month and day is a single digit => then add a '0' in from of it
+    """
+    if y_m_d[0] > 2020:
+                y_m_d[0]= 2000
+    if y_m_d[1] > 12:
+        y_m_d[1]= 1
+    if y_m_d[2] > 31:
+        y_m_d[2] = 1
+    
+    if y_m_d[1] < 10:
+        m_d_str[0] = addZero(y_m_d[1])
+    if y_m_d[2] < 10:
+        m_d_str[1] = addZero(y_m_d[2])
+    
+    #split the line with ','
+
+    #if the string before the first ',' is a digit
+    
+    sql = "start transaction;"
+    sql += " update flights"
+    sql += " set seats_available = case"
+    sql += " when seats_available > 0 and flight_id = " + lines[1]
+    sql += " then seats_available-1 else seats_available"
+    sql += " end,"
+    sql += " seats_booked = case "
+    sql += " when flight_id = " + lines[1] +  " then seats_booked+1 else seats_booked"
+    sql += " end;"
+    sql += " insert into bookings"
+    sql += " values(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
+    sql += " insert into ticket"
+    sql += " values(" + str(ticket_no) + ", " + str(book_ref) + ", " + lines[1] + ", null, null, null);"
+    sql += " commit;"
+    server_var[0].execute(sql)
+
+        
+
 def yesTrans(server_var, fileName, threadNum):
     file = open(fileName, 'r')
     book_ref = 0
     ticket_number = 6000000000
     y_m_d = [2003, 1, 2]
     m_d_str = ["", ""]
+    
+    lines = []
+
     for line in file:
-        """
-            y_m_d is a array with [year, month, day]
-            m_d_str is a array with [month, day] both data is in the data type string
-            
-            if month and day is a single digit => then add a '0' in from of it
-        """
-        if y_m_d[0] > 2020:
-                 y_m_d[0]= 2000
-        if y_m_d[1] > 12:
-            y_m_d[1]= 1
-        if y_m_d[2] > 31:
-            y_m_d[2] = 1
-        
-        if y_m_d[1] < 10:
-            m_d_str[0] = addZero(y_m_d[1])
-        if y_m_d[2] < 10:
-            m_d_str[1] = addZero(y_m_d[2])
-        
-        #split the line with ','
         string = line.split(',')
+        if line[0].isdigit(): 
+            lines.append(string) 
 
-        #if the string before the first ',' is a digit
-        if string[0].isdigit(): 
-            sql = "start transaction;"
-            sql += " update flights"
-            sql += " set seats_available = case"
-            sql += " when seats_available > 0 and flight_id = " + string[1]
-            sql += " then seats_available-1 else seats_available"
-            sql += " end,"
-            sql += " seats_booked = case "
-            sql += " when flight_id = " + string[1] +  " then seats_booked+1 else seats_booked"
-            sql += " end;"
-            sql += " insert into bookings"
-            sql += " values(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
-            sql += " insert into ticket"
-            sql += " values(" + str(ticket_number) + ", " + str(book_ref) + ", " + string[1] + ", null, null, null);"
-            sql += " commit;"
-            server_var[0].execute(sql)
-
+    threads = []
+    for line in range(len(lines)):
+        for i in range(int(threadNum)):
             y_m_d[0] = y_m_d[0]+1
             y_m_d[1] = y_m_d[1]+1
             y_m_d[2] = y_m_d[2]+1
             book_ref = book_ref+1
-            ticket_number = ticket_number+1            
-
-            
+            ticket_number = ticket_number+1
+            print("creating thread #", i)
+            x = threading.Thread(target=yesTransThread, args=(server_var, book_ref, ticket_number, y_m_d, m_d_str, lines[line]))
+            if line < len(lines)-1:
+                print(str(line) + " updated to " + str(line+1))
+                line = line+1
+                print("line:", line, ", range:", len(lines))
+            x.start()
+            threads.append(x)
+        
+        for thread in range(len(threads)):
+            print("thread #", thread, "joined")
+            threads[thread].join()
 
 def noTrans(server_var, fileName, threadNum):
     file = open(fileName, 'r')
@@ -123,8 +145,10 @@ def noTrans(server_var, fileName, threadNum):
 def updateDB(server_var, inputList):
 
     #delete all the rows from all the tables
-    sql = "delete from bookings; "
-    sql += "delete from ticket; commit;"
+    sql = "delete from ticket; "
+    sql += "delete from bookings;"
+    sql += " update flights "
+    sql += " set seats_available = 50, seats_booked = 0; commit;"
     server_var[0].execute(sql)
 
     if inputList[1] == 'n':
