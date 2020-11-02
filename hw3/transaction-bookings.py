@@ -160,15 +160,7 @@ def noTrans(server_var, fileName, threadNum):
     m_d_str = ["", ""]
     for i in file:
         string = i.split(',')
-        if string[0].isdigit():
-
-            """
-            sql = "SELECT flights.scheduled_departure FROM flights WHERE seats_available > 0 AND flight_id = " + string[1] + ";"
-            server_var[0].execute(sql)
-            fetch = server_var[0].fetchall()
-            print(fetch)
-            """
-            
+        if string[0].isdigit():   
             
             # sql = "SELECT * FROM flights WHERE seats_available = 50 AND flight_id = " + string[1] + ";"
             # sql = "SELECT flights.scheduled_departure FROM flights WHERE seats_available > 0 AND flight_id = " + string[1] + ";"
@@ -187,50 +179,55 @@ def noTrans(server_var, fileName, threadNum):
             if y_m_d[2] < 10:
                 m_d_str[1] = addZero(y_m_d[2])
 
+            sql = " SELECT seats_available FROM flights WHERE flight_id = " + string[1] + ";"
+            server_var[0].execute(sql)
+            fetch = server_var[0].fetchall()
+            temp = fetch
+            store = temp[0][0]  
             
             sql = " INSERT INTO bookings"
             sql += " VALUES(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 12700);" 
             server_var[0].execute(sql)
 
-            sql = " SELECT * FROM bookings"
-            server_var[0].execute(sql)
-            #fetch = server_var[0].fetchall()
-            #print(fetch)         
-            
-            sql = " INSERT INTO ticket(ticket_no, book_ref, passenger_id, passenger_name)"
-            sql += " VALUES(" + str(ticket_no) + ", " + str(book_ref) + ", " + string[0] + ", " + "'LUKE'" + ");"
-            server_var[0].execute(sql)
+            if (store > 0):
 
-            sql = " SELECT * FROM ticket"
-            server_var[0].execute(sql)
-            fetch = server_var[0].fetchall()
-            print(fetch)
-            
-            sql = " INSERT INTO ticket_flights(ticket_no, flight_id, fare_conditions, amount)"
-            sql += " VALUES(" + str(ticket_no) + ", " + string[1] + ", " + "'Economy', " + "'12700');"
-            server_var[0].execute(sql)
+                sql = " INSERT INTO ticket(ticket_no, book_ref, passenger_id, passenger_name)"
+                sql += " VALUES(" + str(ticket_no) + ", " + str(book_ref) + ", " + string[0] + ", " + "'LUKE'" + ");"
+                server_var[0].execute(sql)
 
-            sql = " SELECT * FROM ticket_flights"
-            server_var[0].execute(sql)
-            fetch = server_var[0].fetchall()
-            ##print(fetch)
+                """
+                sql = " SELECT * FROM ticket"
+                server_var[0].execute(sql)
+                fetch = server_var[0].fetchall()
+                print(fetch)
+                """
+            
+                sql = " INSERT INTO ticket_flights(ticket_no, flight_id, fare_conditions, amount)"
+                sql += " VALUES(" + str(ticket_no) + ", " + string[1] + ", " + "'Economy', " + "'12700');"
+                server_var[0].execute(sql)
+
+                sql = " UPDATE flights"
+                sql += " SET seats_available = seats_available - 1, seats_booked = seats_booked + 1 WHERE flight_id = " + string[1] + ";"
+                server_var[0].execute(sql)
+
+                sql = " SELECT seats_available FROM flights WHERE flight_id = " + string[1] + ";"
+                server_var[0].execute(sql)
+                fetch = server_var[0].fetchall()
+                temp = fetch
+                store = temp[0][0]    
+
+                # print(string[1] + " " + str(store)) 
+                # print(book_ref)
+
+            else:
+                print("no seats available!")  
+                # print(book_ref)
                 
-            #print(string[0])
-            #print(string[1])
-
-            print(book_ref)
         book_ref = book_ref + 1
         y_m_d[0] = y_m_d[0] + 1
         y_m_d[1] = y_m_d[1] + 1
         y_m_d[2] = y_m_d[2] + 1
-        ticket_no = ticket_no + 1
-            
-
-
-        # 1. generate book_ref number, update bookings
-        # 2. generate ticket_num, insert new record in ticket and ticket_flights IF available seats in specified flight AND date
-        # 3. update seats_booked and seats_available in flights (simple)
-        # 4. IF no available seats, ONLY book_ref generated and bookings updated
+        ticket_no = ticket_no + 1   
  
 def updateDB(server_var, inputList):
 
