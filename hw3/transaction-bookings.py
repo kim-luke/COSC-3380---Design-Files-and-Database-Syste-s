@@ -31,8 +31,6 @@ import time
 
 
 """
-success_num = 0
-unsuccess_num = 0
 
 def connectWithDB():
     with open('password.txt') as f:
@@ -48,13 +46,30 @@ def connectWithDB():
 
     return server_var
 
+def callThread():
+    format = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=format, level=logging.INFO,
+                        datefmt="%H:%M:%S")
+
+    threads = list()
+    for index in range(3):
+        logging.info("Main    : create and start thread %d.", index)
+        x = threading.Thread(target=thread_function, args=( index,))
+        threads.append(x)
+        x.start()
+
+    for index, thread in enumerate(threads):
+        logging.info("Main    : before joining thread %d.", index)
+        thread.join()
+        logging.info("Main    : thread %d done", index)
+
 #adds '0' infront of a single digit and returns it
 def addZero(singleDigit):
     toReturn = '0' + str(singleDigit)
     return toReturn
 
 def yesTransThread(server_var, book_ref, ticket_no, y_m_d, m_d_str, lines):
-    # print(lines[0] + " " + lines[1] + " executed")
+    print(lines[0] + " " + lines[1] + " executed")
     """
         y_m_d is a array with [year, month, day]
         m_d_str is a array with [month, day] both data is in the data type string
@@ -72,50 +87,10 @@ def yesTransThread(server_var, book_ref, ticket_no, y_m_d, m_d_str, lines):
         m_d_str[0] = addZero(y_m_d[1])
     if y_m_d[2] < 10:
         m_d_str[1] = addZero(y_m_d[2])
-    
-    sql = "SELECT CASE WHEN EXISTS ("
-    sql += "SELECT *"
-    sql += " FROM flights"
-    sql += " WHERE flight_id = " + lines[1]
-    sql += " and seats_available = 0)"
-    sql += " THEN CAST(1 AS BIT)"
-    sql += " ELSE CAST(0 AS BIT) END "
-    server_var[0].execute(sql)
-    # print(server_var[0].description)
-    try:
-        fetch = server_var[0].fetchall()
-        print(fetch[0][0])
-        if fetch[0][0] == "1":
-            print("fail")
-            global unsuccess_num
-            unsuccess_num+=1
-            return
-        elif fetch[0][0] == "0":
-            print("success")
-            global success_num
-            success_num+=1
-    except:
-        # print("fail")
-        global unsuccess_num
-        unsuccess_num+=1
-        return
-    # if server_var[0].description is not None:
-    #     # print("WHAZZA")
-    #     fetch = server_var[0].fetchall()
-    #     print(fetch)
-    #     if fetch == 0:
-    #         print("fail")
-    #         global unsuccess_num
-    #         unsuccess_num+=1
-    #     elif fetch == 1:
-    #         print("success")
-    #         global success_num
-    #         success_num+=1
-    # else:
-    #     print("nothing to fetch")
-    #     return
 
-    sql = " start transaction;"
+    sql = "declare"
+    sql += " temp int;"
+    sql += " begin"
     sql += " update flights"
     sql += " set seats_available = case"
     sql += " when seats_available > 0 and flight_id = " + lines[1]
@@ -128,8 +103,18 @@ def yesTransThread(server_var, book_ref, ticket_no, y_m_d, m_d_str, lines):
     sql += " values(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
     sql += " insert into ticket(ticket_no, book_ref, passenger_id)"
     sql += " values(" + str(ticket_no) + ", " + str(book_ref) + ", " + lines[1] + ");"
-    sql += " commit;"
+    sql += " exception"
+    sql += " when seats_available = 0 then rollback, select case when exists(select * from flights where seats_available = 0) then cast (1 as bit)"
+    sql += " when seats_available > 0 then commit, select case when exists(select * from flights where seats_available > 0) then cast (0 as bit);"
+    sql += " end;"
     server_var[0].execute(sql)
+    fetch = server_var[0].fetchall()
+    print(fetch)
+    if fetch[0] == 1:
+        print("success")
+    elif fetch[0] == 0:
+        print("fail")
+    # time.sleep(1)
 
 def yesTrans(server_var, fileName, threadNum):
     file = open(fileName, 'r')
@@ -147,7 +132,7 @@ def yesTrans(server_var, fileName, threadNum):
 
     line = 0
     while line < len(lines):
-        # print(line)
+        print(line)
         threads = []
         for i in range(int(threadNum)):
             y_m_d[0] = y_m_d[0]+1
@@ -155,22 +140,20 @@ def yesTrans(server_var, fileName, threadNum):
             y_m_d[2] = y_m_d[2]+1
             book_ref = book_ref+1
             ticket_number = ticket_number+1
-            # print("creating thread #", i)
+            print("creating thread #", i)
             x = threading.Thread(target=yesTransThread, args=(server_var, book_ref, ticket_number, y_m_d, m_d_str, lines[line]))
             if line < len(lines)-1:
-                # print(str(line) + " updated to " + str(line+1))
+                print(str(line) + " updated to " + str(line+1))
                 line+=1
-                # print("line:", line, ", range:", len(lines))
+                print("line:", line, ", range:", len(lines))
             x.start()
             threads.append(x)
-            # print("x got appended")
+            print("x got appended")
         
         for thread in range(len(threads)):
-            # print("thread #", thread, "joined")
+            print("thread #", thread, "joined")
             threads[thread].join()
         line+=1
-    print("success: ", success_num)
-    print("unsuccess: ", unsuccess_num)
 
 def noTrans(server_var, fileName, threadNum):
     file = open(fileName, 'r')
@@ -196,10 +179,10 @@ def noTrans(server_var, fileName, threadNum):
         # 4. IF no available seats, ONLY book_ref generated and bookings updated
 
 def updateDB(server_var, inputList):
+
     #delete all the rows from all the tables
-    sql = "truncate ticket CASCADE; "
-    sql += "delete from ticket;"
-    sql += " delete from bookings;"
+    sql = "delete from ticket; "
+    sql += "delete from bookings;"
     sql += " update flights "
     sql += " set seats_available = 50, seats_booked = 0; commit;"
     # sql = "select case when exists ("
