@@ -186,6 +186,8 @@ def noTransThread(lines, lock):
         connection = connectWithDB()
         global book_ref
         global ticket_number
+        book_ref += 1
+        ticket_number += 1
         global queryList
 
         global update_bookings
@@ -195,6 +197,7 @@ def noTransThread(lines, lock):
 
         continue_ = countShit(connection, lines)
         if continue_ == -1:
+            print("inserting 1")
             sql = " insert into bookings"
             sql += " values(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
             queryList += sql
@@ -204,10 +207,11 @@ def noTransThread(lines, lock):
         if continue_ == -2:
             return
 
-        sql = " insert into bookings"
-        sql += " values(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);" 
+        sql = " \ninsert into bookings"
+        sql += " \nvalues(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
         update_bookings += 1
         queryList += sql
+        print("inserting 2")
         connection[0].execute(sql)
 
         sql = " \nINSERT INTO ticket(ticket_no, book_ref, passenger_id, passenger_name)"
@@ -227,9 +231,6 @@ def noTransThread(lines, lock):
         update_ticket_flights += 1
         queryList += sql
         connection[0].execute(sql)
-    
-    book_ref += 1
-    ticket_number += 1
 
 def noTrans(fileName, threadNum):
     file = open(fileName, 'r')
@@ -263,20 +264,17 @@ def updateDB(inputList):
     sql += " update flights "
     sql += " set seats_available = 50, seats_booked = 0; commit;"
     connectWithDB()[0].execute(sql)
-    start = time.time()
     if inputList[1] == 'n':
         noTrans(inputList[0], inputList[2]) #(fileName, # of threads)
     if inputList[1] == 'y':
         yesTrans(inputList[0], inputList[2]) #(fileName, # of threads)
-    end = time.time()
-    print("success: ", success_num)
-    print("unsuccess: ", unsuccess_num)
+    print("successful transactions: ", success_num)
+    print("unsuccessful transactions: ", unsuccess_num)
     # print("fail: ", fail_num) 
     print("# of records update for table bookings:", update_bookings)
     print("# of records update for table flights:", update_flights)
     print("# of records update for table ticket:", update_ticket)
     print("# of records update for table ticket_flights:", update_ticket_flights)
-    print(f"Runtime of the program is {end - start} seconds")
     outputFile.write(queryList)
 
 def main(argv):
