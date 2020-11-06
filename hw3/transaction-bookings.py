@@ -8,7 +8,7 @@ book_ref = 0
 ticket_number = 0
 y_m_d = [2003, 1, 2]
 m_d_str = ["", ""]
-
+ 
 success_num = 0
 unsuccess_num = 0
 fail_num = 0
@@ -20,7 +20,7 @@ update_ticket_flights = 0
 
 count = 0
 queryList = ""
-outputFile = open("checkdb.sql", "w")
+outputFile = open("transaction-bookings.sql", "w")
 
 def connectWithDB():
     with open('password.txt') as f:
@@ -29,12 +29,14 @@ def connectWithDB():
     username = lines[0]
     pg_password = lines[1]
 
-    conn = psycopg2.connect(database = "COSC3380", user = username, password = pg_password)
-    cursor = conn.cursor()
-
-    server_var = [cursor, conn]
-
-    return server_var 
+    try:
+        conn = psycopg2.connect(database = "COSC3380", user = username, password = pg_password)
+        cursor = conn.cursor()
+        server_var = [cursor, conn]
+        return server_var 
+    except:
+        print("Failed to connect")
+        return -1
 
 #adds '0' infront of a single digit and returns it
 def addZero(singleDigit):
@@ -103,6 +105,8 @@ def yesTransThread(lines, lock):
         global update_ticket_flights
 
         connection = connectWithDB()
+        if connection == -1:
+            return
         continue_ = countShit(connection, lines)
         if continue_ == -1:
             sql = "\nbegin transaction;"
@@ -121,6 +125,7 @@ def yesTransThread(lines, lock):
         sql += " \ninsert into bookings"
         sql += " \nvalues(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
         update_bookings += 1
+
         sql += " \nupdate flights"
         sql += " \nset seats_available = case"
         sql += " \nwhen seats_available > 0 and flight_id = " + lines[1]
@@ -130,13 +135,17 @@ def yesTransThread(lines, lock):
         sql += " \nwhen flight_id = " + lines[1] +  " then seats_booked+1 else seats_booked"
         sql += " \nend;"
         update_flights += 1
+
         sql += " \nINSERT INTO ticket(ticket_no, book_ref, passenger_id, passenger_name)"
         sql += " \nVALUES(" + str(ticket_number) + ", " + str(book_ref) + ", " + lines[0] + ", " + "' '" + ");\n"
         update_ticket += 1
+        
         sql += " \nINSERT INTO ticket_flights(ticket_no, flight_id, fare_conditions, amount)"
         sql += " \nVALUES(" + str(ticket_number) + ", " + lines[1] + ", " + "'Economy', " + "'12700');\n"
         update_ticket_flights += 1
+        
         sql += " \ncommit transaction;"
+        
         queryList += sql
         connection[0].execute(sql)
 
@@ -184,6 +193,8 @@ def noTransThread(lines, lock):
     
     with lock:
         connection = connectWithDB()
+        if connection == -1:
+            return
         global book_ref
         global ticket_number
         book_ref += 1
@@ -197,11 +208,11 @@ def noTransThread(lines, lock):
 
         continue_ = countShit(connection, lines)
         if continue_ == -1:
-            print("inserting 1")
-            sql = " insert into bookings"
+            sql = "\ninsert into bookings"
             sql += " values(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
             queryList += sql
             connection[0].execute(sql)
+            connection[1].commit()
             update_bookings += 1
             return
         if continue_ == -2:
@@ -210,20 +221,22 @@ def noTransThread(lines, lock):
         sql = " \ninsert into bookings"
         sql += " \nvalues(" + str(book_ref) + ", TIMESTAMP '" + str(y_m_d[0]) + "-" + m_d_str[0] + "-" + m_d_str[1] + " 00:00:00-05'" + ", 127000);"  
         update_bookings += 1
-        queryList += sql
-        print("inserting 2")
         connection[0].execute(sql)
+        connection[1].commit()
+        queryList += sql
 
         sql = " \nINSERT INTO ticket(ticket_no, book_ref, passenger_id, passenger_name)"
         sql += " \nVALUES(" + str(ticket_number) + ", " + str(book_ref) + ", " + lines[0] + ", " + "' '" + ");\n"
         update_ticket += 1
-        queryList += sql
         connection[0].execute(sql)
+        connection[1].commit()
+        queryList += sql
 
         sql = " \nUPDATE flights"
         sql += " \nSET seats_available = seats_available - 1, seats_booked = seats_booked + 1 WHERE flight_id = " + lines[1] + ";\n"
         update_flights += 1
         connection[0].execute(sql)
+        connection[1].commit()
         queryList += sql
 
         sql = " \nINSERT INTO ticket_flights(ticket_no, flight_id, fare_conditions, amount)"
@@ -231,12 +244,12 @@ def noTransThread(lines, lock):
         update_ticket_flights += 1
         queryList += sql
         connection[0].execute(sql)
+        connection[1].commit()
 
 def noTrans(fileName, threadNum):
     file = open(fileName, 'r')
     
     lines = []
-
     for line in file:
         string = line.split(',')
         if line[0].isdigit(): 
@@ -263,7 +276,10 @@ def updateDB(inputList):
     sql += " delete from bookings;"
     sql += " update flights "
     sql += " set seats_available = 50, seats_booked = 0; commit;"
-    connectWithDB()[0].execute(sql)
+    conn_temp = connectWithDB()
+    if conn_temp == -1:
+        return
+    conn_temp[0].execute(sql)
     if inputList[1] == 'n':
         noTrans(inputList[0], inputList[2]) #(fileName, # of threads)
     if inputList[1] == 'y':
